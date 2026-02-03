@@ -11,9 +11,9 @@ const app = express();
 
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: "https://taskpile.netlify.app",
     credentials: true,
-  })
+  }),
 );
 app.use(express.json()); // puts the requested data in req.body
 app.use(cookieParser());
@@ -23,7 +23,10 @@ app.use("/auth", authRoutes);
 
 // Test endpoint
 app.get("/test", (req, res) => {
-  res.json({ message: "Server is working!", timestamp: new Date().toISOString() });
+  res.json({
+    message: "Server is working!",
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // Health check endpoint
