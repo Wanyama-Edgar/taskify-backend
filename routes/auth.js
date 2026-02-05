@@ -8,8 +8,8 @@ const router = express.Router();
 
 const cookieOptions = {
   httpOnly: true,
-  secure: false, // Set to false for development
-  sameSite: "Lax",
+  secure: true, // for production
+  sameSite: "None",
   maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
   path: "/",
 };
@@ -31,9 +31,10 @@ router.post("/register", async (req, res) => {
   }
 
   try {
-    const userExists = await pool.query("SELECT * FROM users WHERE email = $1", [
-      email,
-    ]);
+    const userExists = await pool.query(
+      "SELECT * FROM users WHERE email = $1",
+      [email],
+    );
 
     if (userExists.rows.length > 0) {
       return res.status(400).json({ message: "User already exists" });
@@ -43,7 +44,7 @@ router.post("/register", async (req, res) => {
 
     const newUser = await pool.query(
       "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id, name, email, created_at",
-      [name, email, hashedPassword]
+      [name, email, hashedPassword],
     );
 
     const token = generateToken(newUser.rows[0].id);
@@ -114,13 +115,15 @@ router.put("/profile", protect, async (req, res) => {
     const userId = req.user.id;
 
     if (!name || !email) {
-      return res.status(400).json({ message: "Please provide all required fields" });
+      return res
+        .status(400)
+        .json({ message: "Please provide all required fields" });
     }
 
     // Check if email is already taken by another user
     const emailExists = await pool.query(
       "SELECT * FROM users WHERE email = $1 AND id != $2",
-      [email, userId]
+      [email, userId],
     );
 
     if (emailExists.rows.length > 0) {
@@ -129,7 +132,7 @@ router.put("/profile", protect, async (req, res) => {
 
     const updatedUser = await pool.query(
       "UPDATE users SET name = $1, email = $2 WHERE id = $3 RETURNING id, name, email, created_at",
-      [name, email, userId]
+      [name, email, userId],
     );
 
     res.json({ user: updatedUser.rows[0] });
@@ -146,19 +149,26 @@ router.put("/password", protect, async (req, res) => {
     const userId = req.user.id;
 
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({ message: "Please provide all required fields" });
+      return res
+        .status(400)
+        .json({ message: "Please provide all required fields" });
     }
 
     // Get current user with password
-    const user = await pool.query("SELECT * FROM users WHERE id = $1", [userId]);
-    
+    const user = await pool.query("SELECT * FROM users WHERE id = $1", [
+      userId,
+    ]);
+
     if (user.rows.length === 0) {
       return res.status(404).json({ message: "User not found" });
     }
 
     // Verify current password
-    const isMatch = await bcrypt.compare(currentPassword, user.rows[0].password);
-    
+    const isMatch = await bcrypt.compare(
+      currentPassword,
+      user.rows[0].password,
+    );
+
     if (!isMatch) {
       return res.status(400).json({ message: "Current password is incorrect" });
     }
@@ -167,10 +177,10 @@ router.put("/password", protect, async (req, res) => {
     const hashedNewPassword = await bcrypt.hash(newPassword, 10);
 
     // Update password
-    await pool.query(
-      "UPDATE users SET password = $1 WHERE id = $2",
-      [hashedNewPassword, userId]
-    );
+    await pool.query("UPDATE users SET password = $1 WHERE id = $2", [
+      hashedNewPassword,
+      userId,
+    ]);
 
     res.json({ message: "Password updated successfully" });
   } catch (error) {
@@ -186,13 +196,13 @@ router.delete("/account", protect, async (req, res) => {
 
     // Delete user's todos first (cascade should handle this, but being explicit)
     await pool.query("DELETE FROM todo WHERE user_id = $1", [userId]);
-    
+
     // Delete user account
     await pool.query("DELETE FROM users WHERE id = $1", [userId]);
 
     // Clear cookie
     res.cookie("token", "", { ...cookieOptions, maxAge: 1 });
-    
+
     res.json({ message: "Account deleted successfully" });
   } catch (error) {
     console.error(error);
